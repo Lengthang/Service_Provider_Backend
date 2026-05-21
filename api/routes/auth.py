@@ -78,7 +78,8 @@ async def dev_token(phone: str, db: AsyncSession = Depends(get_db)):
         is_new_user = True
 
     return TokenResponse(
-        access_token=f"dev-token-{user.id}",
+        # access_token=f"dev-token-{user.id}",
+        access_token=create_access_token(str(user.id)),
         is_new_user=is_new_user,
         provider_profile=user.provider_profile if user.provider_profile else None
     )
