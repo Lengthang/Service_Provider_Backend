@@ -1,0 +1,128 @@
+from decimal import Decimal
+
+from pydantic import BaseModel, Field
+from typing import Optional, List
+from uuid import UUID
+from datetime import datetime
+
+# ── Nested summaries for embedding ──
+class CustomerSummary(BaseModel):
+    id: UUID
+    name: Optional[str] = None
+    profile_photo_url: Optional[str] = None
+    class Config:
+        from_attributes = True
+
+
+class ProviderSummary(BaseModel):
+    id: UUID
+    user_id: UUID
+    location: Optional[str] = None
+    avg_rating: float
+    class Config:
+        from_attributes = True
+
+
+class ProviderUserSummary(BaseModel):
+    """Provider details from the perspective of a customer's booking — shows the person."""
+    id: UUID                  # provider profile id
+    name: Optional[str] = None  # provider's user.name
+    profile_photo_url: Optional[str] = None
+    avg_rating: float
+    class Config:
+        from_attributes = True
+
+
+class BookingItemInput(BaseModel):
+    service_id: UUID
+    quantity: int = Field(ge=1)
+
+
+class BookingItemResponse(BaseModel):
+    service_id: UUID
+    title: str
+    image_url: Optional[str] = None
+    quantity: int
+    unit_price: Decimal
+    line_total: Decimal
+    duration_minutes: Optional[int] = None
+
+
+class BookingCreate(BaseModel):
+    items: List[BookingItemInput] = Field(min_length=1)
+    scheduled_at: datetime
+    address: str
+    latitude: Optional[float] = Field(default=None, ge=-90, le=90)
+    longitude: Optional[float] = Field(default=None, ge=-180, le=180)
+    notes: Optional[str] = None
+    method: str = Field(pattern="^(card|bank|wallet)$")
+    promo_code: Optional[str] = None
+
+class BookingStatusUpdate(BaseModel):
+    status: str  # in_progress, awaiting_confirmation, completed, cancelled, rejected
+
+
+class StatusHistoryResponse(BaseModel):
+    status: str
+    changed_by: Optional[UUID] = None
+    changed_at: datetime
+
+    class Config:
+        from_attributes = True
+
+# ── Price preview (cart) ──
+class PricePreviewItem(BaseModel):
+    service_id: UUID
+    quantity: int = Field(ge=1)
+
+
+class PricePreviewRequest(BaseModel):
+    items: List[PricePreviewItem] = Field(min_length=1)
+
+
+class PricePreviewLineItem(BaseModel):
+    service_id: UUID
+    title: str
+    unit_price: Decimal
+    quantity: int
+    line_total: Decimal
+    duration_minutes: Optional[int] = None
+
+
+class PricePreviewResponse(BaseModel):
+    provider_id: UUID
+    currency: str
+    items: List[PricePreviewLineItem]
+    subtotal: Decimal
+    total: Decimal
+    estimated_duration_minutes: Optional[int] = None
+
+
+class BookingResponse(BaseModel):
+    id: UUID
+    customer_id: UUID
+    provider_id: UUID
+    status: str
+    scheduled_at: datetime
+    address: str
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    notes: Optional[str]
+    created_at: datetime
+
+    subtotal: Decimal
+    discount_amount: Decimal
+    total_amount: Decimal
+    currency: str
+
+    distance_km: Optional[float] = None
+
+    # Embedded for UI rendering
+    customer: Optional[CustomerSummary] = None
+    provider: Optional[ProviderUserSummary] = None
+    items: List[BookingItemResponse] = []
+
+    status_history: List[StatusHistoryResponse] = []
+
+    class Config:
+        from_attributes = True
