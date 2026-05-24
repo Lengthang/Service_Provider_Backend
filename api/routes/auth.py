@@ -55,31 +55,27 @@ async def verify_otp_route(body: VerifyOTPRequest, db: AsyncSession = Depends(ge
 
 @router.post("/dev-token", response_model=TokenResponse)
 async def dev_token(phone: str, db: AsyncSession = Depends(get_db)):
-    # Safety guard — only works in development
     if settings.ENV != "development":
         raise HTTPException(status_code=403, detail="Not allowed in production")
 
-    # eager-load provider_profile if it exists
     result = await db.execute(
         select(User)
         .options(selectinload(User.provider_profile))
         .where(User.phone == phone)
     )
     user = result.scalar_one_or_none()
-
     is_new_user = False
 
     if not user:
-        # New user — create account (no name available via query param)
         user = User(phone=phone)
         db.add(user)
         await db.commit()
-        await db.refresh(user)
+        # Refresh AND populate the relationship in one shot
+        await db.refresh(user, attribute_names=["provider_profile"])
         is_new_user = True
 
     return TokenResponse(
-        # access_token=f"dev-token-{user.id}",
-        access_token=create_access_token(str(user.id)),
+        access_token=create_access_token(str(user.id)),  # also fix: real JWT, not "dev-token-{id}"
         is_new_user=is_new_user,
-        provider_profile=user.provider_profile if user.provider_profile else None
+        provider_profile=user.provider_profile,
     )

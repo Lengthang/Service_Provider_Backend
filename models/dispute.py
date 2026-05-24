@@ -16,8 +16,9 @@ class Dispute(Base):
     status = Column(String(20), default="open")  # open, resolved
     resolution = Column(String(20), nullable=True)  # release, refund, partial
     resolution_note = Column(Text, nullable=True)
-    provider_payout = Column(Numeric(12, 2), nullable=True)  # for partial resolution
-    customer_refund = Column(Numeric(12, 2), nullable=True)  # for partial resolution
+    provider_payout = Column(Numeric(12, 2), nullable=True)  # actual amount credited to provider, net of commission
+    customer_refund = Column(Numeric(12, 2), nullable=True)  # actual amount refunded to customer
+    platform_commission = Column(Numeric(12, 2), nullable=True)  # commission taken by the platform
     resolved_by = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
     resolved_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))

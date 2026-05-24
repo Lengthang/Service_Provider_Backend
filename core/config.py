@@ -1,4 +1,5 @@
 from dotenv import load_dotenv
+from decimal import Decimal
 import os
 
 load_dotenv()
@@ -22,4 +23,12 @@ class Settings:
     ENV = "development"
     ESCROW_AUTO_RELEASE_HOURS: int = 24
     CURRENCY: str = os.getenv("CURRENCY", "USD")
+    # Fraction (0-1) of each escrow release taken by the platform; the provider
+    # receives the remainder. Override per environment via PLATFORM_COMMISSION_RATE.
+    PLATFORM_COMMISSION_RATE: Decimal = Decimal(os.getenv("PLATFORM_COMMISSION_RATE", "0.15"))
+    # User whose wallet collects the commission. Required when the rate is > 0.
+    PLATFORM_USER_ID: str = os.getenv("PLATFORM_USER_ID", "")
 settings = Settings()
+
+if not (Decimal("0") <= settings.PLATFORM_COMMISSION_RATE <= Decimal("1")):
+    raise RuntimeError("PLATFORM_COMMISSION_RATE must be between 0 and 1")

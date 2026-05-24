@@ -9,10 +9,12 @@ from fastapi import HTTPException
 from models.dispute import Dispute
 from models.booking import Booking, BookingStatusHistory
 from models.payment import EscrowAccount, BookingConfirmation
-from models.provider import ProviderProfile
 from models.user import User
 from schemas.dispute import DisputeCreate, DisputeResolve
-from services.wallet_service import release_escrow_to_provider, refund_escrow_to_customer, get_or_create_wallet
+from services.wallet_service import (
+    release_escrow_to_provider, refund_escrow_to_customer,
+    get_or_create_wallet, credit_provider_payout,
+)
 from models.wallet import WalletTransaction
 
 async def create_dispute(
@@ -107,11 +109,12 @@ async def resolve_dispute(
     now = datetime.now(timezone.utc)
 
     if data.resolution == "release":
-        # full payment to provider
-        await release_escrow_to_provider(db, booking, escrow)
+        # full escrow to provider, net of platform commission
+        provider_net, commission = await release_escrow_to_provider(db, booking, escrow)
         booking.status = "completed"
-        dispute.provider_payout = escrow.amount
+        dispute.provider_payout = provider_net
         dispute.customer_refund = Decimal("0.00")
+        dispute.platform_commission = commission
 
     elif data.resolution == "refund":
         # full refund to customer
@@ -119,6 +122,7 @@ async def resolve_dispute(
         booking.status = "cancelled"
         dispute.provider_payout = Decimal("0.00")
         dispute.customer_refund = escrow.amount
+        dispute.platform_commission = Decimal("0.00")
 
     elif data.resolution == "partial":
         # split the escrow between both parties
@@ -133,6 +137,8 @@ async def resolve_dispute(
                 detail="provider_payout and customer_refund must be non-negative"
             )
 
+        # provider_payout / customer_refund are the gross split of the escrow;
+        # the platform commission is then taken out of the provider's share.
         total = data.provider_payout + data.customer_refund
         if total != escrow.amount:
             raise HTTPException(
@@ -140,20 +146,10 @@ async def resolve_dispute(
                 detail=f"provider_payout + customer_refund must equal escrow amount ({escrow.amount})"
             )
 
-        # credit provider
-        result = await db.execute(
-            select(ProviderProfile).where(ProviderProfile.id == booking.provider_id)
+        # credit provider their share, net of platform commission
+        provider_net, commission = await credit_provider_payout(
+            db, booking, data.provider_payout, "Partial escrow release (dispute resolved)"
         )
-        provider = result.scalar_one_or_none()
-        if not provider:
-            raise HTTPException(status_code=404, detail="Provider not found for this booking")
-        provider_wallet = await get_or_create_wallet(db, provider.user_id)
-        provider_wallet.balance += data.provider_payout
-        db.add(WalletTransaction(
-            wallet_id=provider_wallet.id, type="escrow_release", amount=data.provider_payout,
-            reference_id=str(booking.id),
-            description=f"Partial escrow release (dispute resolved)"
-        ))
 
         # refund customer
         customer_wallet = await get_or_create_wallet(db, booking.customer_id)
@@ -167,8 +163,9 @@ async def resolve_dispute(
         escrow.status = "released"
         escrow.released_at = now
         booking.status = "completed"
-        dispute.provider_payout = data.provider_payout
+        dispute.provider_payout = provider_net
         dispute.customer_refund = data.customer_refund
+        dispute.platform_commission = commission
 
     db.add(BookingStatusHistory(
         booking_id=booking.id, status=booking.status, changed_by=admin.id

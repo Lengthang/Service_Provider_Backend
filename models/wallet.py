@@ -28,7 +28,7 @@ class WalletTransaction(Base):
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     wallet_id = Column(UUID(as_uuid=True), ForeignKey("wallets.id"), nullable=False)
-    type = Column(String(30), nullable=False)  # top_up, escrow_hold, escrow_release, withdrawal, refund
+    type = Column(String(30), nullable=False)  # top_up, escrow_hold, escrow_release, commission, withdrawal, refund
     amount = Column(Numeric(12, 2), nullable=False)
     reference_id = Column(String(255))
     description = Column(String)

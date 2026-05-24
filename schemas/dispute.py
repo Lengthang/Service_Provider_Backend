@@ -27,6 +27,7 @@ class DisputeOut(BaseModel):
     resolution_note: Optional[str] = None
     provider_payout: Optional[Decimal] = None
     customer_refund: Optional[Decimal] = None
+    platform_commission: Optional[Decimal] = None
     resolved_by: Optional[UUID] = None
     resolved_at: Optional[datetime] = None
     created_at: datetime
