@@ -14,6 +14,7 @@ from models.provider import ProviderProfile
 from schemas.booking import (
     BookingCreate,
     BookingResponse,
+    ProviderBookingResponse,
     BookingStatusUpdate,
     PricePreviewRequest,
     PricePreviewResponse,
@@ -23,6 +24,7 @@ from services.booking_service import (
     update_booking_status,
     compute_price_preview,
 )
+from services.wallet_service import split_commission
 from core.config import settings
 from core.dependencies import get_current_user
 from core.distance import haversine_km
@@ -56,7 +58,7 @@ async def view(
     return [serialize_booking(b) for b in bookings]
 
 # --- Provider: view bookings assigned to them ---
-@router.get("/provider", response_model=List[BookingResponse])
+@router.get("/provider", response_model=List[ProviderBookingResponse])
 async def provider_bookings(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
@@ -75,7 +77,7 @@ async def provider_bookings(
         .order_by(Booking.created_at.desc())
     )
     bookings = result.scalars().all()
-    return [serialize_booking(b) for b in bookings]
+    return [serialize_booking(b, include_payout=True) for b in bookings]
 
 # --- Public: real-time price preview for a multi-service cart ---
 @router.post("/price-preview", response_model=PricePreviewResponse)
@@ -139,12 +141,12 @@ def booking_with_relations():
     ]
 
 
-def serialize_booking(b: Booking) -> dict:
+def serialize_booking(b: Booking, include_payout: bool = False) -> dict:
     provider_lat = b.provider.latitude if b.provider else None
     provider_lng = b.provider.longitude if b.provider else None
     distance_km = haversine_km(b.latitude, b.longitude, provider_lat, provider_lng)
 
-    return {
+    data = {
         "id": b.id,
         "customer_id": b.customer_id,
         "provider_id": b.provider_id,
@@ -191,3 +193,10 @@ def serialize_booking(b: Booking) -> dict:
         ],
         "status_history": b.status_history,
     }
+
+    if include_payout:
+        commission, provider_net = split_commission(b.total_amount)
+        data["provider_payout"] = provider_net
+        data["platform_commission"] = commission
+
+    return data

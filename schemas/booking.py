@@ -126,3 +126,14 @@ class BookingResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class ProviderBookingResponse(BookingResponse):
+    """Booking as seen by its assigned provider — adds the provider's payout breakdown.
+
+    These are ESTIMATES based on the current platform commission rate. The actual
+    settled amounts are locked in when escrow is released (see the escrow_release
+    wallet transaction, or the dispute record if the booking was disputed).
+    """
+    provider_payout: Optional[Decimal] = None      # estimated net to the provider
+    platform_commission: Optional[Decimal] = None  # estimated platform cut
