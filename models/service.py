@@ -18,6 +18,7 @@ class Service(Base):
     duration_minutes = Column(Integer, nullable=True)
     min_quantity = Column(Integer, nullable=False, default=1)
     is_active = Column(Boolean, nullable=False, default=True)
+    updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc),)
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
     provider = relationship("ProviderProfile", back_populates="services")

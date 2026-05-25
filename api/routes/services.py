@@ -157,3 +157,15 @@ async def delete_service(
     await db.commit()
     return {"message": "Service deactivated"}
 
+@router.get("/mine", response_model=List[ServiceResponse])
+async def get_my_services(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    provider = await get_approved_provider(current_user, db)
+    result = await db.execute(
+        select(Service)
+        .where(Service.provider_id == provider.id)   # no is_active filter
+        .order_by(Service.created_at.desc())
+    )
+    return result.scalars().all()

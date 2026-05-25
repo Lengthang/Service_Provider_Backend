@@ -34,6 +34,7 @@ class ServiceResponse(BaseModel):
     min_quantity: int = 1
     is_active: bool
     created_at: datetime
+    updated_at: Optional[datetime] = None
 
     class Config:
         from_attributes = True
