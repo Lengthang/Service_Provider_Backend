@@ -46,7 +46,9 @@ async def get_my_profile(
     db: AsyncSession = Depends(get_db)
 ):
     result = await db.execute(
-        select(ProviderProfile).where(ProviderProfile.user_id == current_user.id)
+        select(ProviderProfile)
+        .options(selectinload(ProviderProfile.categories))
+        .where(ProviderProfile.user_id == current_user.id)
     )
     provider = result.scalar_one_or_none()
     if not provider:
@@ -118,6 +120,7 @@ async def edit_own_provider_profile(
 
     await db.commit()
     await db.refresh(provider)
+    await db.refresh(provider, attribute_names=["categories"])
     return provider
 
 # --- Public: browse providers (optionally filter by category, sort by distance) ---

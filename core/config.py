@@ -28,6 +28,10 @@ class Settings:
     PLATFORM_COMMISSION_RATE: Decimal = Decimal(os.getenv("PLATFORM_COMMISSION_RATE", "0.15"))
     # User whose wallet collects the commission. Required when the rate is > 0.
     PLATFORM_USER_ID: str = os.getenv("PLATFORM_USER_ID", "")
+    # --- File uploads (local disk; served by the StaticFiles mount in main.py) ---
+    UPLOAD_DIR: str = os.getenv("UPLOAD_DIR", "uploads")          # on-disk folder
+    MEDIA_URL_PATH: str = "/" + os.getenv("MEDIA_URL_PATH", "media").strip("/")  # public URL prefix
+    MAX_UPLOAD_SIZE_MB: int = int(os.getenv("MAX_UPLOAD_SIZE_MB", "5"))
 settings = Settings()
 
 if not (Decimal("0") <= settings.PLATFORM_COMMISSION_RATE <= Decimal("1")):

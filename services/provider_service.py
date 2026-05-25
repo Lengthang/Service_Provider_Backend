@@ -62,4 +62,5 @@ async def register_provider(
     user.role = UserRole.provider.value
     await db.commit()
     await db.refresh(provider)
+    await db.refresh(provider, attribute_names=["categories"])
     return provider

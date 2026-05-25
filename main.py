@@ -1,5 +1,9 @@
+import os
+
 from fastapi import FastAPI
-from api.routes import auth, providers, categories, services, admin, customer, bookings, payments, promo_codes, disputes, reviews, portfolio
+from fastapi.staticfiles import StaticFiles
+from api.routes import auth, providers, categories, services, admin, customer, bookings, payments, promo_codes, disputes, reviews, portfolio, uploads
+from core.config import settings
 from db.database import AsyncSessionLocal
 from services.escrow_auto_release import auto_release_expired_escrows
 import asyncio
@@ -41,6 +45,17 @@ app.include_router(promo_codes.router)
 app.include_router(disputes.router)
 app.include_router(reviews.router)
 app.include_router(portfolio.router)
+app.include_router(uploads.router)
+
+# Serve uploaded files from disk. The on-disk folder (UPLOAD_DIR) is exposed
+# under MEDIA_URL_PATH — kept distinct from the /uploads write endpoint so the
+# static mount can't shadow it.
+os.makedirs(settings.UPLOAD_DIR, exist_ok=True)
+app.mount(
+    settings.MEDIA_URL_PATH,
+    StaticFiles(directory=settings.UPLOAD_DIR),
+    name="media",
+)
 
 
 @app.get("/")

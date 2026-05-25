@@ -27,3 +27,6 @@ Thumbs.db
 
 # Local scratch
 tmp_*.py
+
+# Uploaded media (local-disk storage)
+uploads/

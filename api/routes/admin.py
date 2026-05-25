@@ -123,6 +123,7 @@ async def approve_provider(
         provider.approved_at = None
     await db.commit()
     await db.refresh(provider)
+    await db.refresh(provider, attribute_names=["categories"])
     return provider
 
 # Explicit ban

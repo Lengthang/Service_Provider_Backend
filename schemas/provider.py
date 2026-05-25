@@ -73,6 +73,7 @@ class ProviderResponse(BaseModel):
     status: ProviderStatus
     created_at: datetime
     distance_km: Optional[float] = None
+    categories: List[CategoryResponse] = []
     class Config:
         from_attributes = True
 
