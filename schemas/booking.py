@@ -137,3 +137,20 @@ class ProviderBookingResponse(BookingResponse):
     """
     provider_payout: Optional[Decimal] = None      # estimated net to the provider
     platform_commission: Optional[Decimal] = None  # estimated platform cut
+
+
+class BookingPayoutOut(BaseModel):
+    """Payout breakdown for one booking, for the assigned provider (or admin).
+
+    While the booking is unsettled, the figures are an estimate at the current
+    commission rate (is_estimate=True). Once escrow is released/refunded they are
+    the actual amounts that moved (is_estimate=False).
+    """
+    booking_id: UUID
+    currency: str
+    gross_amount: Decimal           # escrow / total the split is based on
+    provider_payout: Decimal
+    platform_commission: Decimal
+    commission_rate: Decimal
+    escrow_status: str              # holding | released | refunded | none
+    is_estimate: bool

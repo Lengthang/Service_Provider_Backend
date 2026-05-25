@@ -1,4 +1,5 @@
 from uuid import UUID
+from decimal import Decimal
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -11,10 +12,13 @@ from models.booking import Booking, BookingStatusHistory
 from models.booking_item import BookingItem
 from models.user import User
 from models.provider import ProviderProfile
+from models.payment import EscrowAccount
+from models.wallet import WalletTransaction
 from schemas.booking import (
     BookingCreate,
     BookingResponse,
     ProviderBookingResponse,
+    BookingPayoutOut,
     BookingStatusUpdate,
     PricePreviewRequest,
     PricePreviewResponse,
@@ -114,6 +118,71 @@ async def get_booking(
     if not is_customer and not is_provider and current_user.role != 'admin':
         raise HTTPException(status_code=403, detail="Access denied")
     return serialize_booking(booking)
+
+
+# --- Provider/admin: payout breakdown for a single booking ---
+@router.get("/{booking_id}/payout", response_model=BookingPayoutOut)
+async def booking_payout(
+    booking_id: UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    result = await db.execute(select(Booking).where(Booking.id == booking_id))
+    booking = result.scalar_one_or_none()
+    if not booking:
+        raise HTTPException(status_code=404, detail="Booking not found")
+
+    # Only the assigned provider (or an admin) may see payout figures.
+    provider_result = await db.execute(
+        select(ProviderProfile).where(ProviderProfile.user_id == current_user.id)
+    )
+    provider = provider_result.scalar_one_or_none()
+    is_provider = provider and str(booking.provider_id) == str(provider.id)
+    if not is_provider and current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Only the assigned provider can view payout")
+
+    result = await db.execute(
+        select(EscrowAccount).where(EscrowAccount.booking_id == booking_id)
+    )
+    escrow = result.scalar_one_or_none()
+    escrow_status = escrow.status if escrow else "none"
+
+    if escrow and escrow.status == "released":
+        # Actual settled amounts, read from the recorded transactions
+        # (covers normal release and dispute release/partial).
+        result = await db.execute(
+            select(WalletTransaction).where(
+                WalletTransaction.reference_id == str(booking_id),
+                WalletTransaction.type.in_(["escrow_release", "commission"]),
+            )
+        )
+        txns = result.scalars().all()
+        provider_payout = sum((t.amount for t in txns if t.type == "escrow_release"), Decimal("0.00"))
+        platform_commission = sum((t.amount for t in txns if t.type == "commission"), Decimal("0.00"))
+        gross_amount = escrow.amount
+        is_estimate = False
+    elif escrow and escrow.status == "refunded":
+        # Customer was refunded; the provider received nothing.
+        provider_payout = Decimal("0.00")
+        platform_commission = Decimal("0.00")
+        gross_amount = escrow.amount
+        is_estimate = False
+    else:
+        # Not yet released — project from the current total at the current rate.
+        platform_commission, provider_payout = split_commission(booking.total_amount)
+        gross_amount = booking.total_amount
+        is_estimate = True
+
+    return {
+        "booking_id": booking.id,
+        "currency": settings.CURRENCY,
+        "gross_amount": gross_amount,
+        "provider_payout": provider_payout,
+        "platform_commission": platform_commission,
+        "commission_rate": settings.PLATFORM_COMMISSION_RATE,
+        "escrow_status": escrow_status,
+        "is_estimate": is_estimate,
+    }
 
 # --- Update booking status ---
 @router.patch("/{booking_id}/status", response_model=BookingResponse)
