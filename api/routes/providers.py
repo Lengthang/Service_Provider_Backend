@@ -47,7 +47,10 @@ async def get_my_profile(
 ):
     result = await db.execute(
         select(ProviderProfile)
-        .options(selectinload(ProviderProfile.categories))
+        .options(
+            selectinload(ProviderProfile.categories),
+            selectinload(ProviderProfile.availability), 
+        )
         .where(ProviderProfile.user_id == current_user.id)
     )
     provider = result.scalar_one_or_none()

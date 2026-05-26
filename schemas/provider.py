@@ -63,17 +63,18 @@ class ProviderResponse(BaseModel):
     profile_photo_url: Optional[str] = None
     years_experience: int = 0
     certification: Optional[str] = None
-    certification_url: Optional[str] = None                # ← NEW
+    certification_url: Optional[str] = None
     location: Optional[str] = None
     latitude: Optional[float] = None
     longitude: Optional[float] = None
-    service_radius_km: int = 10                            # ← NEW
+    service_radius_km: int = 10
     avg_rating: float
     is_available: bool
     status: ProviderStatus
     created_at: datetime
     distance_km: Optional[float] = None
     categories: List[CategoryResponse] = []
+    availability: List[AvailabilityResponse] = []    
     class Config:
         from_attributes = True
 
