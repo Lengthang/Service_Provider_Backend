@@ -9,8 +9,9 @@ from fastapi import HTTPException
 from models.dispute import Dispute
 from models.booking import Booking, BookingStatusHistory
 from models.payment import EscrowAccount, BookingConfirmation
+from models.provider import ProviderProfile
 from models.user import User
-from schemas.dispute import DisputeCreate, DisputeResolve
+from schemas.dispute import DisputeCreate, DisputeRespond, DisputeResolve
 from services.wallet_service import (
     release_escrow_to_provider, refund_escrow_to_customer,
     get_or_create_wallet, credit_provider_payout,
@@ -73,6 +74,48 @@ async def create_dispute(
     await db.commit()
     await db.refresh(dispute)
     return dispute
+
+
+async def respond_to_dispute(
+    db: AsyncSession,
+    user: User,
+    dispute_id: UUID,
+    data: DisputeRespond
+) -> Dispute:
+
+    result = await db.execute(
+        select(Dispute).where(Dispute.id == dispute_id)
+    )
+    dispute = result.scalar_one_or_none()
+    if not dispute:
+        raise HTTPException(status_code=404, detail="Dispute not found")
+
+    # only the provider assigned to the disputed booking may respond
+    result = await db.execute(
+        select(Booking).where(Booking.id == dispute.booking_id)
+    )
+    booking = result.scalar_one_or_none()
+
+    result = await db.execute(
+        select(ProviderProfile).where(ProviderProfile.user_id == user.id)
+    )
+    provider = result.scalar_one_or_none()
+    if not provider or not booking or str(booking.provider_id) != str(provider.id):
+        raise HTTPException(status_code=403, detail="Only the assigned provider can respond to this dispute")
+
+    if dispute.status != "open":
+        raise HTTPException(status_code=400, detail="Dispute already resolved")
+
+    if dispute.provider_response is not None:
+        raise HTTPException(status_code=400, detail="A response has already been submitted for this dispute")
+
+    dispute.provider_response = data.response
+    dispute.provider_responded_at = datetime.now(timezone.utc)
+
+    await db.commit()
+    await db.refresh(dispute)
+    return dispute
+
 
 async def resolve_dispute(
     db: AsyncSession, 

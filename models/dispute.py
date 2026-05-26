@@ -13,6 +13,8 @@ class Dispute(Base):
     booking_id = Column(UUID(as_uuid=True), ForeignKey("bookings.id"), unique=True, nullable=False)
     raised_by = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
     reason = Column(Text, nullable=False)
+    provider_response = Column(Text, nullable=True)  # provider's rebuttal to the customer's claim
+    provider_responded_at = Column(DateTime(timezone=True), nullable=True)
     status = Column(String(20), default="open")  # open, resolved
     resolution = Column(String(20), nullable=True)  # release, refund, partial
     resolution_note = Column(Text, nullable=True)
