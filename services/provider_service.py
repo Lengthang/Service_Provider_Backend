@@ -40,6 +40,7 @@ async def register_provider(
         years_experience=data.years_experience,
         certification=data.certification,
         certification_url=data.certification_url,
+        national_id_url=data.national_id_url,
         location=data.location,
         latitude=data.latitude,
         longitude=data.longitude,

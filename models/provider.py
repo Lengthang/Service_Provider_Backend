@@ -21,6 +21,7 @@ class ProviderProfile(Base):
     years_experience = Column(Integer, default=0, nullable=False)
     certification = Column(Text, nullable=True)
     certification_url = Column(Text, nullable=True)
+    national_id_url = Column(Text, nullable=True)
     location = Column(String(255), nullable=True)
     latitude = Column(Numeric(9, 6), nullable=True)
     longitude = Column(Numeric(9, 6), nullable=True)

@@ -80,8 +80,10 @@ async def edit_own_provider_profile(
         provider.years_experience = body.years_experience
     if body.certification is not None:
         provider.certification = body.certification
-    if body.certification_url is not None:                  
+    if body.certification_url is not None:
         provider.certification_url = body.certification_url
+    if body.national_id_url is not None:
+        provider.national_id_url = body.national_id_url
     if body.location is not None:
         provider.location = body.location
     if body.latitude is not None:
@@ -239,6 +241,7 @@ async def get_provider_profile(
         "years_experience": provider.years_experience,
         "certification": provider.certification,
         "certification_url": provider.certification_url,
+        "national_id_url": provider.national_id_url,
         "location": provider.location,
         "latitude": float(provider.latitude) if provider.latitude is not None else None,
         "longitude": float(provider.longitude) if provider.longitude is not None else None,

@@ -33,6 +33,7 @@ class ProviderRegisterRequest(BaseModel):
     years_experience: int = Field(default=0, ge=0)
     certification: Optional[str] = None
     certification_url: Optional[str] = None
+    national_id_url: Optional[str] = None
     location: str
     latitude: float = Field(ge=-90, le=90)
     longitude: float = Field(ge=-180, le=180)
@@ -47,6 +48,7 @@ class ProviderUpdate(BaseModel):
     years_experience: Optional[int] = Field(default=None, ge=0)
     certification: Optional[str] = None
     certification_url: Optional[str] = None
+    national_id_url: Optional[str] = None
     location: Optional[str] = None
     latitude: Optional[float] = Field(default=None, ge=-90, le=90)
     longitude: Optional[float] = Field(default=None, ge=-180, le=180)
@@ -64,6 +66,7 @@ class ProviderResponse(BaseModel):
     years_experience: int = 0
     certification: Optional[str] = None
     certification_url: Optional[str] = None
+    national_id_url: Optional[str] = None
     location: Optional[str] = None
     latitude: Optional[float] = None
     longitude: Optional[float] = None
