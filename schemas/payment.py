@@ -34,6 +34,10 @@ class SavedPaymentMethodCreate(BaseModel):
     is_default: bool = False
 
 
+class SavedPaymentMethodUpdate(BaseModel):
+    is_default: bool
+
+
 class SavedPaymentMethodOut(BaseModel):
     id: UUID
     type: str

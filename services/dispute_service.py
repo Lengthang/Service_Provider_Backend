@@ -68,7 +68,8 @@ async def create_dispute(
     dispute = Dispute(
         booking_id=data.booking_id,
         raised_by=user.id,
-        reason=data.reason
+        reason=data.reason,
+        reason_image_urls=data.reason_image_urls
     )
     db.add(dispute)
     await db.commit()
@@ -110,6 +111,7 @@ async def respond_to_dispute(
         raise HTTPException(status_code=400, detail="A response has already been submitted for this dispute")
 
     dispute.provider_response = data.response
+    dispute.provider_response_image_urls = data.response_image_urls
     dispute.provider_responded_at = datetime.now(timezone.utc)
 
     await db.commit()

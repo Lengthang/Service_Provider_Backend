@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import Optional
+from typing import List, Optional
 from uuid import UUID
 from datetime import datetime
 from decimal import Decimal
@@ -8,10 +8,12 @@ from decimal import Decimal
 class DisputeCreate(BaseModel):
     booking_id: UUID
     reason: str = Field(min_length=10, max_length=2000)
+    reason_image_urls: List[str] = Field(default_factory=list, max_length=10)
 
 
 class DisputeRespond(BaseModel):
     response: str = Field(min_length=10, max_length=2000)
+    response_image_urls: List[str] = Field(default_factory=list, max_length=10)
 
 
 class DisputeResolve(BaseModel):
@@ -26,7 +28,9 @@ class DisputeOut(BaseModel):
     booking_id: UUID
     raised_by: UUID
     reason: str
+    reason_image_urls: List[str] = []
     provider_response: Optional[str] = None
+    provider_response_image_urls: List[str] = []
     provider_responded_at: Optional[datetime] = None
     status: str
     resolution: Optional[str] = None
@@ -49,6 +53,7 @@ class CustomerDisputeOut(BaseModel):
     booking_id: UUID
     raised_by: UUID
     reason: str
+    reason_image_urls: List[str] = []
     status: str
     resolution: Optional[str] = None
     resolution_note: Optional[str] = None

@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import func
+from sqlalchemy import func, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from typing import List
@@ -14,7 +14,7 @@ from models.wallet import Wallet, WalletTransaction
 from models.payment import SavedPaymentMethod, Payment
 from schemas.payment import (
     WalletOut, WalletTopUpRequest, WalletTransactionOut,
-    SavedPaymentMethodCreate, SavedPaymentMethodOut,
+    SavedPaymentMethodCreate, SavedPaymentMethodUpdate, SavedPaymentMethodOut,
     ConfirmationOut,
     WithdrawalCreate, WithdrawalOut
 )
@@ -75,7 +75,51 @@ async def add_payment_method(
     db: AsyncSession = Depends(get_db)
 ):
     method = SavedPaymentMethod(user_id=user.id, **data.model_dump())
+    if method.is_default:
+        # enforce a single default per user
+        await db.execute(
+            update(SavedPaymentMethod)
+            .where(
+                SavedPaymentMethod.user_id == user.id,
+                SavedPaymentMethod.is_default == True,
+            )
+            .values(is_default=False)
+        )
     db.add(method)
+    await db.commit()
+    await db.refresh(method)
+    return method
+
+
+@router.patch("/methods/{method_id}", response_model=SavedPaymentMethodOut)
+async def update_payment_method(
+    method_id: str,
+    data: SavedPaymentMethodUpdate,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    result = await db.execute(
+        select(SavedPaymentMethod).where(
+            SavedPaymentMethod.id == method_id,
+            SavedPaymentMethod.user_id == user.id,
+        )
+    )
+    method = result.scalar_one_or_none()
+    if not method:
+        raise HTTPException(status_code=404, detail="Payment method not found")
+
+    if data.is_default:
+        # demote any other method so this user has a single default
+        await db.execute(
+            update(SavedPaymentMethod)
+            .where(
+                SavedPaymentMethod.user_id == user.id,
+                SavedPaymentMethod.id != method.id,
+                SavedPaymentMethod.is_default == True,
+            )
+            .values(is_default=False)
+        )
+    method.is_default = data.is_default
     await db.commit()
     await db.refresh(method)
     return method
