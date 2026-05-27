@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from pydantic import BaseModel, Field
 from typing import Optional, List
 from uuid import UUID
@@ -98,6 +100,9 @@ class ProviderListItem(BaseModel):
     service_radius_km: int = 10
     distance_km: Optional[float] = None
     categories: List[CategoryResponse] = []
+    years_experience: int = 0
+    min_price: Optional[Decimal] = None
+    review_count: int = 0
 
     class Config:
         from_attributes = True

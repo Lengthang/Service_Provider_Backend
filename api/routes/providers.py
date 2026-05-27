@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import delete
+from sqlalchemy import delete, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
@@ -7,6 +7,7 @@ from core.enums import ProviderStatus
 from db.database import get_db
 from models.category import Category
 from models.provider import ProviderProfile
+from models.review import Review
 from models.service import Service
 from models.user import User
 from schemas.provider import (
@@ -163,7 +164,29 @@ async def list_providers(
 
     result = await db.execute(query)
     providers = result.scalars().all()
+    provider_ids = [p.id for p in providers]
 
+    # ── Min price per provider (active services only) ──
+    min_price_map: dict = {}
+    if provider_ids:
+        price_rows = await db.execute(
+            select(Service.provider_id, func.min(Service.price))
+            .where(Service.provider_id.in_(provider_ids), Service.is_active.is_(True))
+            .group_by(Service.provider_id)
+        )
+        for pid, mn in price_rows.all():
+            min_price_map[pid] = mn
+
+    # ── Review count per provider ──
+    review_count_map: dict = {}
+    if provider_ids:
+        review_rows = await db.execute(
+            select(Review.provider_id, func.count(Review.id))
+            .where(Review.provider_id.in_(provider_ids))
+            .group_by(Review.provider_id)
+        )
+        for pid, cnt in review_rows.all():
+            review_count_map[pid] = cnt
     items = []
     for p in providers:
         distance_km = haversine_km(
@@ -181,6 +204,9 @@ async def list_providers(
             "service_radius_km": p.service_radius_km,
             "distance_km": distance_km,
             "categories": p.categories,
+            "years_experience": p.years_experience or 0,
+            "min_price": min_price_map.get(p.id),
+            "review_count": review_count_map.get(p.id, 0),
             "_created_at": p.created_at,
         })
 
