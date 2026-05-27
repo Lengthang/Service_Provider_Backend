@@ -24,10 +24,6 @@ class PromoCode(Base):
     expires_at = Column(DateTime(timezone=True), nullable=True)
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime(timezone=True), default=_utcnow)
-    title = Column(String(60), nullable=True)       # eyebrow, e.g. "NEW YEAR OFFER"
-    headline = Column(String(120), nullable=True)   # big text, supports \n + {percent}
-    subtitle = Column(String(160), nullable=True)   # optional fine print under headline
-    cta_label = Column(String(40), nullable=True)   # button text, supports {code}
 
 class PromoRedemption(Base):
     __tablename__ = "promo_redemptions"
