@@ -1,6 +1,7 @@
 from db.database import Base
 
 from models.user import User
+from models.location import SavedLocation
 from models.promo import PromoCode, PromoRedemption
 from models.category import Category
 from models.provider import ProviderProfile

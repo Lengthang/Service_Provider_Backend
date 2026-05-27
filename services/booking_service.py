@@ -7,6 +7,7 @@ from core.config import settings
 from core.enums import BookingStatus, ProviderStatus, UserRole
 from models.booking import Booking, BookingStatusHistory, BookingPhoto
 from models.booking_item import BookingItem
+from models.location import SavedLocation
 from models.payment import EscrowAccount, Payment
 from models.provider import ProviderProfile
 from models.service import Service
@@ -171,14 +172,38 @@ async def create_booking(
             detail=f"Provider is only available during: {windows}"
         )
 
+    # Resolve the service location. A saved location takes precedence over any
+    # inline address/coordinates; otherwise we use the current-GPS fields sent by
+    # the client. Either way the coordinates are snapshotted onto the booking, so
+    # later edits/deletes of the saved location don't affect this booking.
+    if data.saved_location_id is not None:
+        result = await db.execute(
+            select(SavedLocation).where(
+                SavedLocation.id == data.saved_location_id,
+                SavedLocation.user_id == customer.id,
+            )
+        )
+        location = result.scalar_one_or_none()
+        if not location:
+            raise HTTPException(status_code=404, detail="Saved location not found")
+        # booking.address is NOT NULL; fall back to the label if no human-readable
+        # address was saved.
+        address = location.address or location.label
+        latitude = location.latitude
+        longitude = location.longitude
+    else:
+        address = data.address
+        latitude = data.latitude
+        longitude = data.longitude
+
     # Create the booking (amounts may be patched after escrow if a promo applies)
     booking = Booking(
         customer_id=customer.id,
         provider_id=provider_id,
         scheduled_at=data.scheduled_at,
-        address=data.address,
-        latitude=data.latitude,
-        longitude=data.longitude,
+        address=address,
+        latitude=latitude,
+        longitude=longitude,
         notes=data.notes,
         subtotal=subtotal,
         discount_amount=Decimal("0.00"),

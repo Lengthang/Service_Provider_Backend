@@ -1,6 +1,6 @@
 from decimal import Decimal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 from typing import Optional, List
 from uuid import UUID
 from datetime import datetime
@@ -51,12 +51,25 @@ class BookingItemResponse(BaseModel):
 class BookingCreate(BaseModel):
     items: List[BookingItemInput] = Field(min_length=1)
     scheduled_at: datetime
-    address: str
+    # Service location comes from one of two sources:
+    #   • a saved location (set saved_location_id; the server fills in coordinates), or
+    #   • the device's current GPS fix (send address + latitude/longitude inline).
+    # Exactly one source is required.
+    saved_location_id: Optional[UUID] = None
+    address: Optional[str] = None
     latitude: Optional[float] = Field(default=None, ge=-90, le=90)
     longitude: Optional[float] = Field(default=None, ge=-180, le=180)
     notes: Optional[str] = None
     method: str = Field(pattern="^(card|bank|wallet)$")
     promo_code: Optional[str] = None
+
+    @model_validator(mode="after")
+    def _require_location_source(self):
+        if self.saved_location_id is None and not (self.address and self.address.strip()):
+            raise ValueError(
+                "Provide either a saved_location_id or an address (with coordinates)"
+            )
+        return self
 
 class BookingStatusUpdate(BaseModel):
     status: str  # in_progress, awaiting_confirmation, completed, cancelled, rejected

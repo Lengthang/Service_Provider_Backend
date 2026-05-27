@@ -2,7 +2,7 @@ import os
 
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
-from api.routes import auth, providers, categories, services, admin, customer, bookings, payments, promo_codes, disputes, reviews, portfolio, uploads
+from api.routes import auth, providers, categories, services, admin, customer, bookings, payments, promo_codes, disputes, reviews, portfolio, uploads, location
 from core.config import settings
 from db.database import AsyncSessionLocal
 from services.escrow_auto_release import auto_release_expired_escrows
@@ -36,6 +36,7 @@ app = FastAPI(
 app.include_router(auth.router)
 app.include_router(admin.router)
 app.include_router(customer.router)
+app.include_router(location.router)
 app.include_router(providers.router)
 app.include_router(bookings.router)
 app.include_router(categories.router)

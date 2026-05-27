@@ -15,6 +15,7 @@ import models.booking            # noqa: F401
 import models.booking_item       # noqa: F401
 import models.category           # noqa: F401
 import models.dispute            # noqa: F401
+import models.location           # noqa: F401
 import models.payment            # noqa: F401
 import models.portfolio          # noqa: F401
 import models.promo              # noqa: F401
