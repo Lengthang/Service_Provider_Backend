@@ -113,5 +113,6 @@ class ProviderDetailResponse(ProviderResponse):
     availability: List[AvailabilityResponse] = []
     services: List[ServiceResponse] = []
     categories: List[CategoryResponse] = []
+    total_jobs_completed: int = 0
     class Config:
         from_attributes = True

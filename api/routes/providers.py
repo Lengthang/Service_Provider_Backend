@@ -3,8 +3,9 @@ from sqlalchemy import delete, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
-from core.enums import ProviderStatus
+from core.enums import ProviderStatus, BookingStatus
 from db.database import get_db
+from models.booking import Booking
 from models.category import Category
 from models.provider import ProviderProfile
 from models.review import Review
@@ -259,6 +260,15 @@ async def get_provider_profile(
     )
     services = services_result.scalars().all()
 
+    total_jobs_completed = await db.scalar(
+        select(func.count())
+        .select_from(Booking)
+        .where(
+            Booking.provider_id == provider.id,
+            Booking.status == BookingStatus.COMPLETED.value,
+        )
+    )
+
     distance_km = haversine_km(
         customer_lat, customer_lng, provider.latitude, provider.longitude
     )
@@ -285,4 +295,5 @@ async def get_provider_profile(
         "availability": provider.availability,
         "services": services,
         "categories": provider.categories,
+        "total_jobs_completed": total_jobs_completed or 0,
     }

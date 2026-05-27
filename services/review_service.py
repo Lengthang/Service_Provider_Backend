@@ -5,6 +5,7 @@ from decimal import Decimal
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy import func
+from sqlalchemy.orm import selectinload
 from fastapi import HTTPException
 
 from models.review import Review
@@ -70,6 +71,9 @@ async def create_review(
 
     await db.commit()
     await db.refresh(review)
+    # `user` is the customer and is already loaded; attach it so the nested
+    # `customer` serializes without triggering an async lazy-load.
+    review.customer = user
     return review
 
 async def _recalculate_provider_rating(
@@ -96,6 +100,7 @@ async def get_provider_reviews(
 ) -> list[Review]:
     result = await db.execute(
         select(Review)
+        .options(selectinload(Review.customer))
         .where(Review.provider_id == provider_id)
         .order_by(Review.created_at.desc())
     )

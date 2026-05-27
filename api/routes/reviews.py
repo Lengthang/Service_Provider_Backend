@@ -3,6 +3,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
+from sqlalchemy.orm import selectinload
 from typing import List
 
 from db.database import get_db
@@ -33,6 +34,7 @@ async def my_reviews(
 ):
     result = await db.execute(
         select(Review)
+        .options(selectinload(Review.customer))
         .where(Review.customer_id == user.id)
         .order_by(Review.created_at.desc())
     )
@@ -60,7 +62,11 @@ async def review_for_booking(
     booking_id: UUID,
     db: AsyncSession = Depends(get_db)
 ):
-    result = await db.execute(select(Review).where(Review.booking_id == booking_id))
+    result = await db.execute(
+        select(Review)
+        .options(selectinload(Review.customer))
+        .where(Review.booking_id == booking_id)
+    )
     review = result.scalar_one_or_none()
     if not review:
         raise HTTPException(status_code=404, detail="No review for this booking")

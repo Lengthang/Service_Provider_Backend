@@ -11,6 +11,15 @@ class ReviewCreate(BaseModel):
     comment: Optional[str] = Field(default=None, max_length=2000)
 
 
+class ReviewCustomer(BaseModel):
+    id: UUID
+    name: Optional[str] = None
+    profile_photo_url: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+
 class ReviewOut(BaseModel):
     id: UUID
     booking_id: UUID
@@ -19,6 +28,7 @@ class ReviewOut(BaseModel):
     rating: int
     comment: Optional[str] = None
     created_at: datetime
+    customer: Optional[ReviewCustomer] = None
 
     class Config:
         from_attributes = True
