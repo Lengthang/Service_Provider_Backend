@@ -20,6 +20,8 @@ from schemas.booking import (
     ProviderBookingResponse,
     BookingPayoutOut,
     BookingStatusUpdate,
+    BookingPhotoCreate,
+    BookingPhotoResponse,
     PricePreviewRequest,
     PricePreviewResponse,
 )
@@ -27,6 +29,9 @@ from services.booking_service import (
     create_booking,
     update_booking_status,
     compute_price_preview,
+    add_booking_photo,
+    list_booking_photos,
+    delete_booking_photo,
 )
 from services.wallet_service import split_commission
 from core.config import settings
@@ -200,6 +205,40 @@ async def update_status(
     booking = await update_booking_status(booking_id, new_status, current_user, db)
     return serialize_booking(booking)
 
+
+# --- Provider: attach a before/after photo to a job ---
+# Upload the image first via POST /uploads/image, then post the returned URL here.
+@router.post("/{booking_id}/photos", response_model=BookingPhotoResponse, status_code=201)
+async def add_photo(
+    booking_id: UUID,
+    body: BookingPhotoCreate,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    return await add_booking_photo(booking_id, body, current_user, db)
+
+
+# --- Customer/provider/admin: list a job's before/after photos ---
+@router.get("/{booking_id}/photos", response_model=List[BookingPhotoResponse])
+async def get_photos(
+    booking_id: UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    return await list_booking_photos(booking_id, current_user, db)
+
+
+# --- Provider: remove a photo they attached ---
+@router.delete("/{booking_id}/photos/{photo_id}", status_code=204)
+async def remove_photo(
+    booking_id: UUID,
+    photo_id: UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    await delete_booking_photo(booking_id, photo_id, current_user, db)
+
+
 # ── Helper for consistent eager loading ──
 def booking_with_relations():
     return [
@@ -207,6 +246,7 @@ def booking_with_relations():
         selectinload(Booking.customer),
         selectinload(Booking.items).selectinload(BookingItem.service),
         selectinload(Booking.provider).selectinload(ProviderProfile.user),
+        selectinload(Booking.photos),
     ]
 
 
@@ -259,6 +299,15 @@ def serialize_booking(b: Booking, include_payout: bool = False) -> dict:
                 "duration_minutes": item.service.duration_minutes if item.service else None,
             }
             for item in (b.items or [])
+        ],
+        "photos": [
+            {
+                "id": photo.id,
+                "url": photo.url,
+                "kind": photo.kind,
+                "uploaded_at": photo.uploaded_at,
+            }
+            for photo in (b.photos or [])
         ],
         "status_history": b.status_history,
     }

@@ -6,7 +6,7 @@ from models.category import Category
 from models.provider import ProviderProfile
 from models.availability import ProviderAvailability
 from models.service import Service
-from models.booking import Booking, BookingStatusHistory
+from models.booking import Booking, BookingStatusHistory, BookingPhoto
 from models.payment import Payment, EscrowAccount, BookingConfirmation, SavedPaymentMethod, WithdrawalRequest
 from models.wallet import Wallet, WalletTransaction
 from models.dispute import Dispute

@@ -5,14 +5,14 @@ from sqlalchemy.future import select
 from fastapi import HTTPException
 from core.config import settings
 from core.enums import BookingStatus, ProviderStatus, UserRole
-from models.booking import Booking, BookingStatusHistory
+from models.booking import Booking, BookingStatusHistory, BookingPhoto
 from models.booking_item import BookingItem
 from models.payment import EscrowAccount, Payment
 from models.provider import ProviderProfile
 from models.service import Service
 from models.availability import ProviderAvailability
 from models.user import User
-from schemas.booking import BookingCreate, PricePreviewItem
+from schemas.booking import BookingCreate, PricePreviewItem, BookingPhotoCreate
 from datetime import datetime, timedelta
 from decimal import Decimal
 from sqlalchemy.orm import selectinload
@@ -226,6 +226,7 @@ async def create_booking(
             selectinload(Booking.customer),
             selectinload(Booking.items).selectinload(BookingItem.service),
             selectinload(Booking.provider).selectinload(ProviderProfile.user),
+            selectinload(Booking.photos),
         )
         .where(Booking.id == booking.id)
     )
@@ -347,7 +348,125 @@ async def update_booking_status(
             selectinload(Booking.customer),
             selectinload(Booking.items).selectinload(BookingItem.service),
             selectinload(Booking.provider).selectinload(ProviderProfile.user),
+            selectinload(Booking.photos),
         )
         .where(Booking.id == booking.id)
     )
     return result.scalar_one()
+
+
+# Photos document the job while it's being done; once it's settled
+# (completed/cancelled/rejected) or disputed, the gallery is frozen.
+PHOTO_EDITABLE_STATUSES = {"in_progress", "awaiting_confirmation"}
+
+
+async def _booking_for_assigned_provider(
+    booking_id: UUID,
+    current_user: User,
+    db: AsyncSession,
+) -> Booking:
+    """Load a booking and assert current_user is its assigned provider."""
+    result = await db.execute(select(Booking).where(Booking.id == booking_id))
+    booking = result.scalar_one_or_none()
+    if not booking:
+        raise HTTPException(status_code=404, detail="Booking not found")
+
+    result = await db.execute(
+        select(ProviderProfile).where(ProviderProfile.user_id == current_user.id)
+    )
+    provider = result.scalar_one_or_none()
+    if not provider or str(provider.id) != str(booking.provider_id):
+        raise HTTPException(
+            status_code=403,
+            detail="Only the assigned provider can manage this booking's photos",
+        )
+    return booking
+
+
+async def add_booking_photo(
+    booking_id: UUID,
+    data: BookingPhotoCreate,
+    current_user: User,
+    db: AsyncSession,
+) -> BookingPhoto:
+    booking = await _booking_for_assigned_provider(booking_id, current_user, db)
+
+    if booking.status not in PHOTO_EDITABLE_STATUSES:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Photos can only be added while the job is in progress or "
+                f"awaiting confirmation (currently '{booking.status}')"
+            ),
+        )
+
+    photo = BookingPhoto(
+        booking_id=booking.id,
+        url=data.url,
+        kind=data.kind,
+        uploaded_by=current_user.id,
+    )
+    db.add(photo)
+    await db.commit()
+    await db.refresh(photo)
+    return photo
+
+
+async def list_booking_photos(
+    booking_id: UUID,
+    current_user: User,
+    db: AsyncSession,
+) -> list[BookingPhoto]:
+    """Return the booking's photos for anyone allowed to see the booking
+    (its customer, its assigned provider, or an admin)."""
+    result = await db.execute(select(Booking).where(Booking.id == booking_id))
+    booking = result.scalar_one_or_none()
+    if not booking:
+        raise HTTPException(status_code=404, detail="Booking not found")
+
+    is_customer = str(booking.customer_id) == str(current_user.id)
+    result = await db.execute(
+        select(ProviderProfile).where(ProviderProfile.user_id == current_user.id)
+    )
+    provider = result.scalar_one_or_none()
+    is_provider = provider and str(provider.id) == str(booking.provider_id)
+    if not is_customer and not is_provider and current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    result = await db.execute(
+        select(BookingPhoto)
+        .where(BookingPhoto.booking_id == booking_id)
+        .order_by(BookingPhoto.uploaded_at)
+    )
+    return list(result.scalars().all())
+
+
+async def delete_booking_photo(
+    booking_id: UUID,
+    photo_id: UUID,
+    current_user: User,
+    db: AsyncSession,
+) -> None:
+    booking = await _booking_for_assigned_provider(booking_id, current_user, db)
+
+    if booking.status not in PHOTO_EDITABLE_STATUSES:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Photos can only be removed while the job is in progress or "
+                f"awaiting confirmation (currently '{booking.status}')"
+            ),
+        )
+
+    result = await db.execute(
+        select(BookingPhoto).where(
+            BookingPhoto.id == photo_id,
+            BookingPhoto.booking_id == booking_id,
+        )
+    )
+    photo = result.scalar_one_or_none()
+    if not photo:
+        raise HTTPException(status_code=404, detail="Photo not found")
+
+    await db.delete(photo)
+    await db.commit()

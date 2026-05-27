@@ -34,6 +34,12 @@ class Booking(Base):
         "BookingItem", back_populates="booking", cascade="all, delete-orphan"
     )
     status_history = relationship("BookingStatusHistory", backref="booking")
+    photos = relationship(
+        "BookingPhoto",
+        back_populates="booking",
+        cascade="all, delete-orphan",
+        order_by="BookingPhoto.uploaded_at",
+    )
 
 
 
@@ -46,4 +52,23 @@ class BookingStatusHistory(Base):
     status = Column(String(50), nullable=False)
     changed_at = Column(DateTime(timezone=True), default=utcnow)
     changed_by = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+
+
+class BookingPhoto(Base):
+    """A before/after photo the provider attaches to document the job.
+
+    The image itself is uploaded via POST /uploads/image (which returns a URL);
+    only that URL is stored here, tagged with whether it's a 'before' or
+    'after' shot. Customers can review these before confirming completion.
+    """
+    __tablename__ = "booking_photos"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    booking_id = Column(UUID(as_uuid=True), ForeignKey("bookings.id", ondelete="CASCADE"), nullable=False)
+    url = Column(Text, nullable=False)
+    kind = Column(String(10), nullable=False)  # "before" | "after"
+    uploaded_by = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    uploaded_at = Column(TIMESTAMP(timezone=True), default=utcnow)
+
+    booking = relationship("Booking", back_populates="photos")
 

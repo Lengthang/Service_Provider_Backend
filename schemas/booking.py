@@ -62,6 +62,22 @@ class BookingStatusUpdate(BaseModel):
     status: str  # in_progress, awaiting_confirmation, completed, cancelled, rejected
 
 
+# ── Before/after job photos (provider-supplied) ──
+class BookingPhotoCreate(BaseModel):
+    url: str = Field(min_length=1, max_length=2000)  # from POST /uploads/image
+    kind: str = Field(pattern="^(before|after)$")
+
+
+class BookingPhotoResponse(BaseModel):
+    id: UUID
+    url: str
+    kind: str
+    uploaded_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
 class StatusHistoryResponse(BaseModel):
     status: str
     changed_by: Optional[UUID] = None
@@ -121,6 +137,7 @@ class BookingResponse(BaseModel):
     customer: Optional[CustomerSummary] = None
     provider: Optional[ProviderUserSummary] = None
     items: List[BookingItemResponse] = []
+    photos: List[BookingPhotoResponse] = []
 
     status_history: List[StatusHistoryResponse] = []
 
