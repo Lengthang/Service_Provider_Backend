@@ -247,6 +247,7 @@ def booking_with_relations():
         selectinload(Booking.items).selectinload(BookingItem.service),
         selectinload(Booking.provider).selectinload(ProviderProfile.user),
         selectinload(Booking.photos),
+        selectinload(Booking.review),
     ]
 
 
@@ -271,6 +272,7 @@ def serialize_booking(b: Booking, include_payout: bool = False) -> dict:
         "total_amount": b.total_amount,
         "currency": settings.CURRENCY,
         "distance_km": distance_km,
+        "has_review": bool(b.review),
         "customer": (
             {
                 "id": b.customer.id,

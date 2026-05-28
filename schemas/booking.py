@@ -146,6 +146,8 @@ class BookingResponse(BaseModel):
 
     distance_km: Optional[float] = None
 
+    has_review: bool = False
+
     # Embedded for UI rendering
     customer: Optional[CustomerSummary] = None
     provider: Optional[ProviderUserSummary] = None
