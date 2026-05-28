@@ -14,7 +14,7 @@ from models.service import Service
 from models.availability import ProviderAvailability
 from models.user import User
 from schemas.booking import BookingCreate, PricePreviewItem, BookingPhotoCreate
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from sqlalchemy.orm import selectinload
 from services.wallet_service import (
@@ -40,6 +40,11 @@ VALID_TRANSITIONS = {
     "rejected":               [],
     "disputed":               ["completed", "cancelled"],
 }
+
+# Customers may cancel an accepted (in_progress) booking only up to this long
+# before the scheduled time, so providers aren't stranded by last-minute drops.
+CANCELLATION_BUFFER_HOURS = 24
+CANCELLATION_BUFFER = timedelta(hours=CANCELLATION_BUFFER_HOURS)
 
 async def compute_price_preview(
     items: list[PricePreviewItem],
@@ -295,11 +300,19 @@ async def update_booking_status(
             if not is_customer:
                 raise HTTPException(status_code=403, detail="Only the customer can cancel a pending booking")
         elif booking.status == "in_progress":
-            if not is_assigned_provider:
+            if is_customer:
+                # Provider has accepted but work happens on the scheduled day;
+                # allow the customer to back out until the buffer window closes.
+                if datetime.now(timezone.utc) >= booking.scheduled_at - CANCELLATION_BUFFER:
+                    raise HTTPException(
+                        status_code=403,
+                        detail=f"Bookings can only be cancelled up to {CANCELLATION_BUFFER_HOURS} hours "
+                               "before the scheduled time. Wait for completion and raise a dispute if needed."
+                    )
+            elif not is_assigned_provider:
                 raise HTTPException(
                     status_code=403,
-                    detail="Cannot cancel after work has started. "
-                           "Wait for completion and raise a dispute if needed."
+                    detail="Not authorized to cancel this booking"
                 )
         elif booking.status == "awaiting_confirmation":
             raise HTTPException(
