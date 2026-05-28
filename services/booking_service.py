@@ -257,6 +257,7 @@ async def create_booking(
             selectinload(Booking.items).selectinload(BookingItem.service),
             selectinload(Booking.provider).selectinload(ProviderProfile.user),
             selectinload(Booking.photos),
+            selectinload(Booking.review),
         )
         .where(Booking.id == booking.id)
     )
@@ -387,6 +388,7 @@ async def update_booking_status(
             selectinload(Booking.items).selectinload(BookingItem.service),
             selectinload(Booking.provider).selectinload(ProviderProfile.user),
             selectinload(Booking.photos),
+            selectinload(Booking.review),
         )
         .where(Booking.id == booking.id)
     )
