@@ -6,7 +6,9 @@ from db.database import get_db
 from models.booking import Booking
 from models.provider import ProviderProfile
 from models.user import User
+from models.wallet import WalletTransaction
 from schemas.booking import BookingResponse
+from schemas.payment import AdminWalletView
 from schemas.user import UserResponse, UserDetailResponse
 from schemas.provider import ProviderResponse, ApprovalRequest
 from services.provider_service import register_provider
@@ -17,6 +19,8 @@ from enum import Enum
 from sqlalchemy.orm import joinedload, selectinload
 from api.routes.bookings import booking_with_relations, serialize_booking
 from sqlalchemy.orm import selectinload
+
+from services.wallet_service import get_or_create_wallet
 
 router = APIRouter(prefix="/admin", tags=["Admin"])
 
@@ -131,6 +135,36 @@ async def get_user_detail(
         raise HTTPException(status_code=404, detail="User ID not found")
 
     return user
+
+# --- Admin: view any user's wallet + transaction history ---
+@router.get("/users/{user_id}/wallet", response_model=AdminWalletView)
+async def get_user_wallet(
+    user_id: str,
+    admin: User = Depends(get_admin_user),
+    db: AsyncSession = Depends(get_db)
+):
+    # Confirm the user exists so we return 404 rather than silently
+    # minting an empty wallet for a bad id.
+    result = await db.execute(select(User).where(User.id == user_id))
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    wallet = await get_or_create_wallet(db, user.id)
+
+    tx_result = await db.execute(
+        select(WalletTransaction)
+        .where(WalletTransaction.wallet_id == wallet.id)
+        .order_by(WalletTransaction.created_at.desc())
+    )
+    transactions = tx_result.scalars().all()
+
+    return AdminWalletView(
+        id=wallet.id,
+        balance=wallet.balance,
+        transactions=transactions,
+    )
+
 # --- approve or reject a provider ---
 @router.patch("/{provider_id}/approval", response_model=ProviderResponse)
 async def approve_provider(

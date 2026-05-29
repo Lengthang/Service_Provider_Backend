@@ -1,6 +1,6 @@
 from decimal import Decimal
 from pydantic import BaseModel, Field
-from typing import Optional
+from typing import List, Optional
 from uuid import UUID
 from datetime import datetime
 
@@ -89,5 +89,13 @@ class WithdrawalOut(BaseModel):
     amount: Decimal
     status: str
     created_at: datetime
+    class Config:
+        from_attributes = True
+# ── Admin: another user's wallet + history in one payload ──
+class AdminWalletView(BaseModel):
+    id: UUID
+    balance: Decimal
+    transactions: List[WalletTransactionOut] = []
+
     class Config:
         from_attributes = True
