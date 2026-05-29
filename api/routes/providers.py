@@ -147,11 +147,13 @@ async def list_providers(
 ):
     query = (
         select(ProviderProfile)
+        .join(ProviderProfile.user)
         .options(
             selectinload(ProviderProfile.user),
             selectinload(ProviderProfile.categories),
         )
-        .where(ProviderProfile.status == ProviderStatus.approved.value)
+        .where(ProviderProfile.status == ProviderStatus.approved.value),
+            User.is_active == True,
     )
     if category_id:
         query = query.where(
@@ -208,6 +210,7 @@ async def list_providers(
             "years_experience": p.years_experience or 0,
             "min_price": min_price_map.get(p.id),
             "review_count": review_count_map.get(p.id, 0),
+            "is_verified": p.is_verified,   
             "_created_at": p.created_at,
         })
 
@@ -237,10 +240,12 @@ async def get_provider_profile(
 ):
     result = await db.execute(
         select(ProviderProfile)
+        .join(ProviderProfile.user)
         .options(
             selectinload(ProviderProfile.user),
             selectinload(ProviderProfile.availability),
             selectinload(ProviderProfile.categories),
+            User.is_active == True, 
         )
         .where(
             ProviderProfile.id == provider_id,
@@ -290,6 +295,7 @@ async def get_provider_profile(
         "avg_rating": float(provider.avg_rating or 0),
         "is_available": provider.is_available,
         "status": provider.status,
+        "is_verified": provider.is_verified,  
         "created_at": provider.created_at,
         "distance_km": distance_km,
         "availability": provider.availability,

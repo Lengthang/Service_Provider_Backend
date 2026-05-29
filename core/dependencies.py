@@ -2,6 +2,7 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
+from core.enums import UserRole
 from db.database import get_db
 from core.security import decode_access_token
 from models.user import User
@@ -21,6 +22,14 @@ async def get_current_user(
     user = result.scalar_one_or_none()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
+    # Banned users keep no access. Admins are exempt so an accidental ban
+    # (or an admin acting on their own account) can never lock admins out.
+    if not user.is_active and user.role != UserRole.admin.value:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Your account has been banned. Contact support.",
+        )
+
     return user
 
 async def get_admin_user(current_user: User = Depends(get_current_user)) -> User:

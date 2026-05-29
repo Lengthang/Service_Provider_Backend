@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
+from core.enums import UserRole
 from db.database import get_db
 from models.user import User
 from schemas.auth import SendOTPRequest, VerifyOTPRequest, TokenResponse
@@ -37,14 +38,19 @@ async def verify_otp_route(body: VerifyOTPRequest, db: AsyncSession = Depends(ge
 
     if not user:
         # New user — create account
-        # if not body.name:
-        #     raise HTTPException(status_code=400, detail="Name is required for new users")
         user = User(phone=body.phone, name=body.name)
         db.add(user)
         await db.commit()
         await db.refresh(user)
         is_new_user = True
 
+    # Banned users cannot log in (admins are exempt).
+    if not user.is_active and user.role != UserRole.admin.value:
+        raise HTTPException(
+            status_code=403,
+            detail="Your account has been banned. Contact support.",
+        )
+    
     token = create_access_token(str(user.id))
     return TokenResponse(
         access_token=token,

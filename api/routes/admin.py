@@ -1,9 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import or_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from core.enums import ProviderStatus, UserRole
+from core.enums import BookingStatus, ProviderStatus, UserRole
 from db.database import get_db
-from models.booking import Booking
+from models.booking import Booking, BookingStatusHistory
+from models.payment import EscrowAccount
 from models.provider import ProviderProfile
 from models.user import User
 from models.wallet import WalletTransaction
@@ -20,7 +22,7 @@ from sqlalchemy.orm import joinedload, selectinload
 from api.routes.bookings import booking_with_relations, serialize_booking
 from sqlalchemy.orm import selectinload
 
-from services.wallet_service import get_or_create_wallet
+from services.wallet_service import get_or_create_wallet, refund_escrow_to_customer
 
 router = APIRouter(prefix="/admin", tags=["Admin"])
 
@@ -204,14 +206,70 @@ async def ban_user(
     user = result.scalar_one_or_none()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
+    if user.role == UserRole.admin.value:
+        raise HTTPException(status_code=400, detail="Admins cannot be banned")
     if not user.is_active:
         raise HTTPException(status_code=400, detail="User is already banned")
 
     user.is_active = False
+
+    # Cancel the banned user's active bookings and refund any held escrow.
+    # The user may be the customer on some bookings and the provider on others.
+    ACTIVE_STATES = [
+        BookingStatus.PENDING.value,
+        BookingStatus.IN_PROGRESS.value,
+        BookingStatus.AWAITING_CONFIRMATION.value,
+    ]
+
+    # Resolve the user's provider profile id (if they are a provider).
+    provider_result = await db.execute(
+        select(ProviderProfile.id).where(ProviderProfile.user_id == user.id)
+    )
+    provider_id = provider_result.scalar_one_or_none()
+
+    booking_filter = Booking.customer_id == user.id
+    if provider_id is not None:
+        booking_filter = or_(
+            Booking.customer_id == user.id,
+            Booking.provider_id == provider_id,
+        )
+
+    bookings_result = await db.execute(
+        select(Booking).where(
+            booking_filter,
+            Booking.status.in_(ACTIVE_STATES),
+        )
+    )
+    affected_bookings = bookings_result.scalars().all()
+
+    cancelled_count = 0
+    for booking in affected_bookings:
+        # Refund any escrow still being held for this booking.
+        escrow_result = await db.execute(
+            select(EscrowAccount).where(
+                EscrowAccount.booking_id == booking.id,
+                EscrowAccount.status == "holding",
+            )
+        )
+        escrow = escrow_result.scalar_one_or_none()
+        if escrow:
+            await refund_escrow_to_customer(db, booking, escrow)
+
+        booking.status = BookingStatus.CANCELLED.value
+        db.add(BookingStatusHistory(
+            booking_id=booking.id,
+            status=BookingStatus.CANCELLED.value,
+            changed_by=admin.id,  # the acting admin performed the cancellation
+        ))
+        cancelled_count += 1
+
     await db.commit()
     await db.refresh(user)
-    return user
 
+    return {
+        "user": UserResponse.model_validate(user),
+        "cancelled_bookings": cancelled_count,
+    }
 
 # Explicit unban
 @router.patch("/{user_id}/unban")

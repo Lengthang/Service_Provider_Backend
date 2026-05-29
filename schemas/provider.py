@@ -77,6 +77,7 @@ class ProviderResponse(BaseModel):
     avg_rating: float
     is_available: bool
     status: ProviderStatus
+    is_verified: bool = False   
     created_at: datetime
     distance_km: Optional[float] = None
     categories: List[CategoryResponse] = []
@@ -104,6 +105,7 @@ class ProviderListItem(BaseModel):
     years_experience: int = 0
     min_price: Optional[Decimal] = None
     review_count: int = 0
+    is_verified: bool = False  
 
     class Config:
         from_attributes = True

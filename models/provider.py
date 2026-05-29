@@ -42,3 +42,13 @@ class ProviderProfile(Base):
         secondary="provider_categories",
         backref="providers"
     )
+
+    @property
+    def is_verified(self) -> bool:
+        """
+        Verified badge rule: approved AND has uploaded at least one
+        identity document (National ID or Certificate). The free-text
+        `certification` field does not count — only an uploaded file.
+        """
+        has_document = bool(self.national_id_url) or bool(self.certification_url)
+        return self.status == ProviderStatus.approved.value and has_document
