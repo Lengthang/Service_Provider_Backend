@@ -16,6 +16,8 @@ from typing import List
 from enum import Enum
 from sqlalchemy.orm import joinedload, selectinload
 from api.routes.bookings import booking_with_relations, serialize_booking
+from sqlalchemy.orm import selectinload
+
 router = APIRouter(prefix="/admin", tags=["Admin"])
 
 # --- Admin: view all bookings ---
@@ -74,7 +76,12 @@ async def get_pending_providers(
     db: AsyncSession = Depends(get_db)
 ):
     result = await db.execute(
-        select(ProviderProfile).where(ProviderProfile.status == 'pending')
+        select(ProviderProfile)
+        .where(ProviderProfile.status == 'pending')
+        .options(
+            selectinload(ProviderProfile.categories),
+            selectinload(ProviderProfile.availability),
+        )
     )
     return result.scalars().all()
 
@@ -90,7 +97,8 @@ async def get_user_detail(
         select(User).where(User.id == user_id)
         .options(
             joinedload(User.provider_profile).selectinload(ProviderProfile.availability),
-            joinedload(User.provider_profile).selectinload(ProviderProfile.services)
+            joinedload(User.provider_profile).selectinload(ProviderProfile.services),
+            joinedload(User.provider_profile).selectinload(ProviderProfile.categories),
         )
     )
     user = result.scalar_one_or_none()
