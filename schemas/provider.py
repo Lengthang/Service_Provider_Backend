@@ -63,6 +63,7 @@ class ProviderUpdate(BaseModel):
 class ProviderResponse(BaseModel):
     id: UUID
     user_id: UUID
+    name: Optional[str] = None
     bio: Optional[str] = None
     profile_photo_url: Optional[str] = None
     years_experience: int = 0

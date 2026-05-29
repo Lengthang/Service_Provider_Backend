@@ -79,11 +79,36 @@ async def get_pending_providers(
         select(ProviderProfile)
         .where(ProviderProfile.status == 'pending')
         .options(
+            selectinload(ProviderProfile.user),
             selectinload(ProviderProfile.categories),
             selectinload(ProviderProfile.availability),
         )
     )
-    return result.scalars().all()
+    providers = result.scalars().all()
+    return [
+        {
+            "id": p.id,
+            "user_id": p.user_id,
+            "name": p.user.name if p.user else None,
+            "bio": p.bio,
+            "profile_photo_url": p.profile_photo_url,
+            "years_experience": p.years_experience or 0,
+            "certification": p.certification,
+            "certification_url": p.certification_url,
+            "national_id_url": p.national_id_url,
+            "location": p.location,
+            "latitude": p.latitude,
+            "longitude": p.longitude,
+            "service_radius_km": p.service_radius_km,
+            "avg_rating": float(p.avg_rating or 0),
+            "is_available": p.is_available,
+            "status": p.status,
+            "created_at": p.created_at,
+            "categories": p.categories,
+            "availability": p.availability,
+        }
+        for p in providers
+    ]
 
 # --- get a detail user show full detail ---
 @router.get("/providers/{user_id}", response_model=UserDetailResponse)
