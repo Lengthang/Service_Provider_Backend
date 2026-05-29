@@ -182,6 +182,9 @@ async def list_providers(
         for pid, mn in price_rows.all():
             min_price_map[pid] = mn
 
+    providers = [p for p in providers if p.id in min_price_map]
+    provider_ids = [p.id for p in providers]
+
     # ── Review count per provider ──
     review_count_map: dict = {}
     if provider_ids:
