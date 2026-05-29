@@ -152,8 +152,10 @@ async def list_providers(
             selectinload(ProviderProfile.user),
             selectinload(ProviderProfile.categories),
         )
-        .where(ProviderProfile.status == ProviderStatus.approved.value),
+        .where(
+            ProviderProfile.status == ProviderStatus.approved.value,
             User.is_active == True,
+        )
     )
     if category_id:
         query = query.where(
@@ -245,11 +247,11 @@ async def get_provider_profile(
             selectinload(ProviderProfile.user),
             selectinload(ProviderProfile.availability),
             selectinload(ProviderProfile.categories),
-            User.is_active == True, 
         )
         .where(
             ProviderProfile.id == provider_id,
             ProviderProfile.status == ProviderStatus.approved.value,
+            User.is_active == True,  # noqa: E712
         )
     )
     provider = result.scalar_one_or_none()
